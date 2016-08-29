@@ -33,7 +33,16 @@
 
 +(void)load{
 
-    [self swizzleInstanceMethod:NSClassFromString(@"__NSArrayI") originSelector:@selector(objectAtIndex:) otherSelector:@selector(sa_objectAtIndex:)];
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        
+        [self swizzleInstanceMethod:NSClassFromString(@"__NSArrayI") originSelector:@selector(objectAtIndex:) otherSelector:@selector(sa_objectAtIndex:)];
+        
+        [self swizzleInstanceMethod:NSClassFromString(@"__NSPlaceholderArray") originSelector:@selector(initWithObjects:count:) otherSelector:@selector(ss_initWithObjects:count:)];
+        
+        [self swizzleClassMethod:NSClassFromString(@"__NSPlaceholderArray") originSelector:@selector(arrayWithObjects:count:) otherSelector:@selector(ss_arrayWithObjects:count:)];
+    });
+
 }
 
 -(id)sa_objectAtIndex:(NSUInteger)index{
@@ -44,6 +53,23 @@
     return nil;
 }
 
+-(id)ss_initWithObjects:(const id  _Nonnull __unsafe_unretained *)objects count:(NSUInteger)cnt{
+
+    for (int i=0; i<cnt; i++) {
+        if(objects[i] == nil)
+            return nil;
+    }
+    
+    return [self ss_initWithObjects:objects count:cnt];
+}
+
++(id)ss_arrayWithObjects:(const id  _Nonnull __unsafe_unretained *)objects count:(NSUInteger)cnt{
+    for (int i=0; i<cnt; i++) {
+        if(objects[i] == nil)
+            return nil;
+    }
+    return [self ss_arrayWithObjects:objects count:cnt];
+}
 
 @end
 
@@ -51,8 +77,12 @@
 
 +(void)load{
 
-    [self swizzleInstanceMethod:NSClassFromString(@"__NSArrayM") originSelector:@selector(addObject:) otherSelector:@selector(sa_addObject:)];
-    [self swizzleInstanceMethod:NSClassFromString(@"__NSArrayM") originSelector:@selector(objectAtIndex:) otherSelector:@selector(sa_objectAtIndex:)];
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        [self swizzleInstanceMethod:NSClassFromString(@"__NSArrayM") originSelector:@selector(addObject:) otherSelector:@selector(sa_addObject:)];
+        [self swizzleInstanceMethod:NSClassFromString(@"__NSArrayM") originSelector:@selector(objectAtIndex:) otherSelector:@selector(sa_objectAtIndex:)];
+    });
 
     
 }
@@ -82,7 +112,12 @@
 @implementation NSMutableDictionary (safeAccess)
 
 +(void)load{
-    [self swizzleInstanceMethod:NSClassFromString(@"__NSDictionaryM") originSelector:@selector(setObject:forKey:) otherSelector:@selector(sa_setObject:forKey:)];
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        
+        [self swizzleInstanceMethod:NSClassFromString(@"__NSDictionaryM") originSelector:@selector(setObject:forKey:) otherSelector:@selector(sa_setObject:forKey:)];
+    });
 }
 
 - (void) sa_setObject:(id)anObject forKey:(id<NSCopying>)aKey
@@ -104,6 +139,56 @@
 @end
 
 @implementation NSDictionary (safeAccess)
++(void)load{
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        [self swizzleInstanceMethod:NSClassFromString(@"__NSPlaceholderDictionary") originSelector:@selector(initWithObjects:forKeys:count:) otherSelector:@selector(ss_initWithObjects:forKeys:count:)];
+        
+        [self swizzleClassMethod:NSClassFromString(@"__NSPlaceholderDictionary") originSelector:@selector(dictionaryWithObjects:forKeys:count:) otherSelector:@selector(ss_dictionaryWithObjects:forKeys:count:)];
+        
+    });
+}
+
+
+-(id)ss_initWithObjects:(const id  _Nonnull __unsafe_unretained *)objects forKeys:(const id<NSCopying>  _Nonnull __unsafe_unretained *)keys count:(NSUInteger)cnt{
+
+    id safeObjects[cnt];
+    id safeKeys[cnt];
+    
+    NSUInteger j = 0;
+    for (NSUInteger i = 0; i < cnt ; i++) {
+        id key = keys[i];
+        id obj = objects[i];
+        if (!key || !obj) {
+            continue;
+        }
+        safeObjects[j] = obj;
+        safeKeys[j] = key;
+        j++;
+    }
+    return  [self ss_initWithObjects:safeObjects forKeys:safeKeys count:j];
+}
+
++(id)ss_dictionaryWithObjects:(const id  _Nonnull __unsafe_unretained *)objects forKeys:(const id<NSCopying>  _Nonnull __unsafe_unretained *)keys count:(NSUInteger)cnt{
+
+    id safeObjects[cnt];
+    id safeKeys[cnt];
+    
+    NSUInteger j = 0;
+    for (NSUInteger i = 0; i < cnt ; i++) {
+        id key = keys[i];
+        id obj = objects[i];
+        if (!key || !obj) {
+            continue;
+        }
+        safeObjects[j] = obj;
+        safeKeys[j] = key;
+        j++;
+    }
+    return [self ss_dictionaryWithObjects:safeObjects forKeys:safeKeys count:j];
+}
+
 
 
 
